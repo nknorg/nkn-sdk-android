@@ -11,9 +11,11 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import org.nkn.sdk.Client
 import org.nkn.sdk.Wallet
 import org.nkn.sdk.crypto.Key
 import org.nkn.sdk.network.RpcApi
+import org.nkn.sdk.network.WsApi
 
 class MainActivity : AppCompatActivity() {
 
@@ -24,7 +26,13 @@ class MainActivity : AppCompatActivity() {
 
         fab.setOnClickListener { view ->
             GlobalScope.launch {
-
+                //                var wsApi = WsApi("89f5c7fda1ab588c9c690414ceab066648e6af69bc78f7d951688dfd47bbefde", "nknsdk")
+//                wsApi.connect()
+                var client = Client(
+                    "89f5c7fda1ab588c9c690414ceab066648e6af69bc78f7d951688dfd47bbefde",
+                    "nknsdk"
+                )
+                client.connect()
 
                 Snackbar.make(view, "res: ", Snackbar.LENGTH_LONG).show()
             }

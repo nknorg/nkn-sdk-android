@@ -5,10 +5,7 @@ import org.libsodium.jni.NaCl
 import org.libsodium.jni.Sodium
 import org.libsodium.jni.crypto.Random
 import org.libsodium.jni.encoders.Hex.HEX
-import org.nkn.sdk.crypto.PUBLICKEY_SIZE
-import org.nkn.sdk.crypto.doubleSha256Hex
-import org.nkn.sdk.crypto.ripemd160Hex
-import org.nkn.sdk.crypto.sha256Hex
+import org.nkn.sdk.crypto.*
 
 
 const val ADDRESS_GEN_PREFIX = "02b825"
@@ -151,6 +148,14 @@ class Utils {
             var curvePubKey = ByteArray(PUBLICKEY_SIZE)
             Sodium.crypto_sign_ed25519_pk_to_curve25519(curvePubKey, ed25519pk)
             return curvePubKey
+        }
+
+        @JvmStatic
+        fun convertSecretKey(ed25519sk: ByteArray):ByteArray{
+            NaCl.sodium()
+            var curveSecKey = ByteArray(SECRET_KEY_SIZE)
+            Sodium.crypto_sign_ed25519_sk_to_curve25519(curveSecKey, ed25519sk)
+            return curveSecKey
         }
     }
 }

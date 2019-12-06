@@ -1,2 +1,4 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="org.nkn.sdk" />
+    package="org.nkn.sdk" >
+    <application android:networkSecurityConfig="@xml/network_security_config"></application>
+</manifest>

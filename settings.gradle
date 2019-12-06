@@ -1,2 +1,2 @@
-include ':demo', ':library'
+include ':library', ':app'
 rootProject.name='nkn-sdk-android'

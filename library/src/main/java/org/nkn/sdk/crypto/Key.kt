@@ -50,4 +50,5 @@ class Key {
         return this.signingKey.sign(message)
     }
 
+
 }

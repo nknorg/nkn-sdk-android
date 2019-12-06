@@ -4,10 +4,15 @@ import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
 import org.nkn.sdk.crypto.*
 import org.nkn.sdk.utils.Utils
-import org.nkn.sdk.error.*
 import org.nkn.sdk.error.WalletError
 import org.nkn.sdk.error.WalletErrorCode
-import java.util.*
+import org.nkn.sdk.network.RpcApi
+import org.nkn.sdk.transaction.newSubscribe
+import org.nkn.sdk.transaction.newTransaction
+import org.nkn.sdk.transaction.newTransfer
+import org.nkn.sdk.transaction.newUnsubscribe
+
+val rpcApi = RpcApi()
 
 fun createPasswordHash(pass: String): ByteArray {
     return doubleSha256(pass)
@@ -60,16 +65,22 @@ class Wallet(
             try {
                 walletJson = Gson().fromJson<KeyStore>(keystore, KeyStore::class.java)
             } catch (e: JsonSyntaxException) {
-                throw WalletError(WalletErrorCode.INVALID_WALLET_FORMAT, INVALID_WALLET_FORMAT)
+                throw WalletError(
+                    WalletErrorCode.INVALID_WALLET_FORMAT,
+                    WalletError.INVALID_WALLET_FORMAT
+                )
             }
 
             val version = walletJson.Version
             if (version < MIN_COMPATIBLE_WALLET_VERSION || version > MAX_COMPATIBLE_WALLET_VERSION) {
-                throw WalletError(WalletErrorCode.INVALID_WALLET_VERSION, INVALID_WALLET_VERSION)
+                throw WalletError(
+                    WalletErrorCode.INVALID_WALLET_VERSION,
+                    WalletError.INVALID_WALLET_VERSION
+                )
             }
             val pwdHash = createPasswordHash(pass)
             if (walletJson.PasswordHash != Utils.hexEncode(sha256Hex(pwdHash))) {
-                throw WalletError(WalletErrorCode.WRONG_PASSWORD, WRONG_PASSWORD)
+                throw WalletError(WalletErrorCode.WRONG_PASSWORD, WalletError.WRONG_PASSWORD)
             }
             val decryptMasterKey = aesDecrypt(
                 Utils.hexDecode(walletJson.MasterKey),
@@ -83,13 +94,27 @@ class Wallet(
             )
             return Wallet(Account(seed), pass, Utils.hexEncode(decryptMasterKey), walletJson.IV)
         }
+
+        @JvmStatic
+        fun getBalanceByAddress(address: String): Double {
+            val json = rpcApi.getBalanceByAddr(address)
+            return json?.getDouble("amount") ?: 0.0
+        }
+
+        @JvmStatic
+        fun getNonceByAddress(address: String): Long? {
+            val json = rpcApi.getNonceByAddr(address)
+            return json?.getLong("nonce")
+        }
+
+
     }
 
     val seed: ByteArray
     val passwordHash: ByteArray
     val iv: ByteArray
     val masterKey: ByteArray
-    var seedEncrypted: ByteArray
+    val seedEncrypted: ByteArray
     val version: Int = WALLET_VERSION
 
     val keyStore: KeyStore
@@ -133,7 +158,6 @@ class Wallet(
         )
     }
 
-
     fun verifyPassword(pass: String): Boolean {
         val passwordHash = createPasswordHash(pass)
         return this.passwordHash.contentEquals(sha256Hex(passwordHash))
@@ -149,5 +173,69 @@ class Wallet(
         }
     }
 
+    fun getBalance(): Double {
+        return getBalanceByAddress(this.address)
+    }
+
+    fun getNonce(): Long? {
+        return getNonceByAddress(this.address)
+    }
+
+    @JvmOverloads
+    fun transferTo(
+        toAddress: String,
+        amount: Double,
+        fee: Long = 0,
+        nonce: Long? = null,
+        attrs: String = ""
+    ): String? {
+        if (!Utils.verifyAddress(toAddress)) {
+            throw WalletError(WalletErrorCode.INVALID_ADDRESS, WalletError.INVALID_ADDRESS)
+        }
+        val balance = this.getBalance()
+        if (balance < amount) {
+            throw WalletError(WalletErrorCode.NOT_ENOUGH_BALANCE, WalletError.NOT_ENOUGH_BALANCE)
+        }
+
+        val nextNonce = nonce ?: this.getNonce() ?: 0
+        val pld = newTransfer(
+            this.programHash,
+            Utils.addressStringToProgramHash(toAddress),
+            amount
+        )
+
+        val txn = newTransaction(this.account, pld, nextNonce, fee, attrs)
+        return rpcApi.sendRawTransaction(Utils.hexEncode(txn.toByteArray()))
+    }
+
+    @JvmOverloads
+    fun subscribe(
+        topic: String,
+        duration: Int,
+        identifier: String? = "",
+        meta: String? = "",
+        nonce: Long? = null,
+        fee: Long? = 0,
+        attrs: String? = ""
+    ): String? {
+        val nextNonce = nonce ?: this.getNonce() ?: 0
+        val pld = newSubscribe(this.publicKeyHash, identifier ?: "", topic, duration, meta ?: "")
+        val txn = newTransaction(this.account, pld, nextNonce, fee ?: 0, attrs ?: "")
+        return rpcApi.sendRawTransaction(Utils.hexEncode(txn.toByteArray()))
+    }
+
+    @JvmOverloads
+    fun unsubscribe(
+        topic: String,
+        identifier: String? = "",
+        nonce: Long? = null,
+        fee: Long? = 0,
+        attrs: String? = ""
+    ): String? {
+        val nextNonce = nonce ?: this.getNonce() ?: 0
+        val pld = newUnsubscribe(this.publicKeyHash, identifier ?: "", topic)
+        val txn = newTransaction(this.account, pld, nextNonce, fee ?: 0, attrs ?: "")
+        return rpcApi.sendRawTransaction(Utils.hexEncode(txn.toByteArray()))
+    }
 
 }

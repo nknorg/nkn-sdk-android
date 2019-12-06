@@ -1,9 +1,14 @@
 package org.nkn.sdk.utils
 
 import okhttp3.internal.toHexString
+import org.libsodium.jni.NaCl
+import org.libsodium.jni.Sodium
 import org.libsodium.jni.crypto.Random
 import org.libsodium.jni.encoders.Hex.HEX
-import org.nkn.sdk.crypto.*
+import org.nkn.sdk.crypto.PUBLICKEY_SIZE
+import org.nkn.sdk.crypto.doubleSha256Hex
+import org.nkn.sdk.crypto.ripemd160Hex
+import org.nkn.sdk.crypto.sha256Hex
 
 
 const val ADDRESS_GEN_PREFIX = "02b825"
@@ -58,14 +63,14 @@ class Utils {
 
         @JvmStatic
         fun genAddressVerifyBytesFromProgramHash(programHash: String): ByteArray {
-            var verifyBytes = doubleSha256Hex(ADDRESS_GEN_PREFIX + programHash)
+            val verifyBytes = doubleSha256Hex(ADDRESS_GEN_PREFIX + programHash)
             return verifyBytes.slice(0 until CHECKSUM_LEN).toByteArray()
         }
 
         @JvmStatic
         fun programHashStringToAddress(programHash: String): String {
-            var addressVerifyBytes = genAddressVerifyBytesFromProgramHash(programHash)
-            var addressBaseData = hexDecode(ADDRESS_GEN_PREFIX + programHash)
+            val addressVerifyBytes = genAddressVerifyBytesFromProgramHash(programHash)
+            val addressBaseData = hexDecode(ADDRESS_GEN_PREFIX + programHash)
             return Base58.encode(addressBaseData + addressVerifyBytes)
         }
 
@@ -97,6 +102,55 @@ class Utils {
             contract += prefixByteCountToHexString("00")
             contract += programHash
             return contract
+        }
+
+        @JvmStatic
+        fun addressStringToProgramHash(address: String): String {
+            val addressBytes = Base58.decode(address)
+            val programHashBytes =
+                addressBytes.slice(ADDRESS_GEN_PREFIX_LEN until addressBytes.size - CHECKSUM_LEN)
+            return hexEncode(programHashBytes.toByteArray())
+        }
+
+        @JvmStatic
+        fun getAddressStringVerifyCode(address: String): String {
+            val addressBytes = Base58.decode(address)
+            val verifyBytes =
+                addressBytes.slice(addressBytes.size - CHECKSUM_LEN until addressBytes.size)
+
+            return hexEncode(verifyBytes.toByteArray())
+        }
+
+        @JvmStatic
+        fun genAddressVerifyCodeFromProgramHash(programHash: String): String {
+            val verifyBytes = genAddressVerifyBytesFromProgramHash(programHash)
+            return hexEncode(verifyBytes)
+        }
+
+        @JvmStatic
+        fun verifyAddress(address: String): Boolean {
+            val addressBytes = Base58.decode(address)
+            if (addressBytes.size != ADDRESS_LEN) {
+                return false
+            }
+            val addressPrefixBytes = addressBytes.slice(0 until ADDRESS_GEN_PREFIX_LEN)
+            val addressPrefix = hexEncode(addressPrefixBytes.toByteArray())
+            if (addressPrefix != ADDRESS_GEN_PREFIX) {
+                return false
+            }
+
+            val programHash = addressStringToProgramHash(address)
+            val addressVerifyCode = getAddressStringVerifyCode(address);
+            val programHashVerifyCode = genAddressVerifyCodeFromProgramHash(programHash)
+            return addressVerifyCode == programHashVerifyCode
+        }
+
+        @JvmStatic
+        fun convertPublicKey(ed25519pk: ByteArray): ByteArray {
+            NaCl.sodium()
+            var curvePubKey = ByteArray(PUBLICKEY_SIZE)
+            Sodium.crypto_sign_ed25519_pk_to_curve25519(curvePubKey, ed25519pk)
+            return curvePubKey
         }
     }
 }

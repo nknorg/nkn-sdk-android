@@ -10,6 +10,7 @@ import org.nkn.sdk.utils.Utils
 const val SEED_SIZE: Int = 32
 const val SECRET_KEY_SIZE: Int = 64
 const val PUBLICKEY_SIZE: Int = 32
+const val SHARED_SIZE: Int = 32
 
 class Key {
     var seed: ByteArray

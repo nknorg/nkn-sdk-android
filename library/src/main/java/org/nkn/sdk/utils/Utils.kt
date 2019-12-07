@@ -4,6 +4,7 @@ import okhttp3.internal.toHexString
 import org.libsodium.jni.NaCl
 import org.libsodium.jni.Sodium
 import org.libsodium.jni.crypto.Random
+import org.libsodium.jni.crypto.SecretBox
 import org.libsodium.jni.encoders.Hex.HEX
 import org.nkn.sdk.crypto.*
 
@@ -143,6 +144,12 @@ class Utils {
         }
 
         @JvmStatic
+        fun getPublicKeyByClientAddr(addr: String): ByteArray {
+            val n = addr.lastIndexOf(".")
+            return if (n < 0) hexDecode(addr) else hexDecode(addr.substring(n + 1))
+        }
+
+        @JvmStatic
         fun convertPublicKey(ed25519pk: ByteArray): ByteArray {
             NaCl.sodium()
             var curvePubKey = ByteArray(PUBLICKEY_SIZE)
@@ -151,11 +158,29 @@ class Utils {
         }
 
         @JvmStatic
-        fun convertSecretKey(ed25519sk: ByteArray):ByteArray{
+        fun convertSecretKey(ed25519sk: ByteArray): ByteArray {
             NaCl.sodium()
             var curveSecKey = ByteArray(SECRET_KEY_SIZE)
             Sodium.crypto_sign_ed25519_sk_to_curve25519(curveSecKey, ed25519sk)
             return curveSecKey
+        }
+
+        @JvmStatic
+        fun computeSharedKey(myCurveSecretKey: ByteArray, otherCurvePubkey: ByteArray): ByteArray {
+            NaCl.sodium()
+            var sharedKey = ByteArray(SHARED_SIZE)
+            Sodium.crypto_box_beforenm(sharedKey, otherCurvePubkey, myCurveSecretKey)
+            return sharedKey
+        }
+
+        @JvmStatic
+        fun decrypt(encrypted: ByteArray, nonce: ByteArray, key: ByteArray): ByteArray {
+            return SecretBox(key).decrypt(nonce, encrypted)
+        }
+
+        @JvmStatic
+        fun encrypt(message: ByteArray, nonce: ByteArray, key: ByteArray): ByteArray {
+            return SecretBox(key).encrypt(nonce, message)
         }
     }
 }

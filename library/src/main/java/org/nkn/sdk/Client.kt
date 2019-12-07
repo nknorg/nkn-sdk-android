@@ -1,12 +1,15 @@
 package org.nkn.sdk
 
 import android.provider.Settings
+import android.util.Log
 import kotlinx.coroutines.*
 import okhttp3.internal.wait
 import org.nkn.sdk.configure.*
 import org.nkn.sdk.network.WsApi
 import java.util.concurrent.Future
 
+
+const val TAG = "Client"
 
 fun genIdentifier(base: String?, id: Int?): String {
     if (id == null) {
@@ -43,27 +46,29 @@ class Client @JvmOverloads constructor(
 
     inner class MultiClientListener : ClientListener() {
         override fun onConnect() {
+            Log.d(TAG, """Client listener "onConnect"""")
             listener?.onConnect()
         }
 
         override fun onMessage(
             src: String,
-            data: String,
+            data: String?,
+            pid: ByteArray,
             type: Int,
-            encrypted: Boolean,
-            pid: ByteArray
+            encrypted: Boolean
+
         ) {
-            listener?.onMessage(src, data, type, encrypted, pid)
+            listener?.onMessage(src, data, pid, type, encrypted)
         }
 
         override fun onBinaryMessage(
             src: String,
-            data: ByteArray,
+            data: ByteArray?,
+            pid: ByteArray,
             type: Int,
-            encrypted: Boolean,
-            pid: ByteArray
+            encrypted: Boolean
         ) {
-            listener?.onBinaryMessage(src, data, type, encrypted, pid)
+            listener?.onBinaryMessage(src, data, pid, type, encrypted)
         }
 
         override fun onClosing() {

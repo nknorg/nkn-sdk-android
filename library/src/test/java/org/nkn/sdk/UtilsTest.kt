@@ -25,9 +25,8 @@ class UtilsTest {
     }
 
     @Test
-    fun test() {
-        val payload = TransactionProto.Payload.newBuilder()
-        payload.type = TransactionProto.PayloadType.TRANSFER_ASSET_TYPE
-        println( payload.typeValue)
+    fun getPublicKeyByClientAddr_test() {
+        var res = Utils.getPublicKeyByClientAddr("heron.25ac590eaca614a0ba4c4387d8514a0b54e948d120c6ff49564e7830c9dec929")
+        Assert.assertEquals(Utils.hexEncode(res), "25ac590eaca614a0ba4c4387d8514a0b54e948d120c6ff49564e7830c9dec929")
     }
 }

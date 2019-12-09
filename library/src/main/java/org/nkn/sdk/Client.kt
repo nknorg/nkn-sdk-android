@@ -1,12 +1,11 @@
 package org.nkn.sdk
 
-import android.provider.Settings
 import android.util.Log
 import kotlinx.coroutines.*
-import okhttp3.internal.wait
 import org.nkn.sdk.configure.*
 import org.nkn.sdk.network.WsApi
-import java.util.concurrent.Future
+import org.nkn.sdk.protocol.PID_SIZE
+import org.nkn.sdk.utils.Utils
 
 
 const val TAG = "Client"
@@ -23,7 +22,7 @@ class Client @JvmOverloads constructor(
     identifier: String?,
     val seedRpcServer: List<String>? = org.nkn.sdk.configure.seed,
     encrypt: Boolean? = ENCRYPT,
-    msgHoldingSeconds: Long? = MSG_HOLDING_SECONDS,
+    val msgHoldingSeconds: Int? = MSG_HOLDING_SECONDS,
     val reconnectIntervalMin: Long? = RECONNECT_INTERVAL_MIN,
     val reconnectIntervalMax: Long? = RECONNECT_INTERVAL_MAX,
     responseTimeout: Long? = RESPONSE_TIMEOUT,
@@ -116,6 +115,25 @@ class Client @JvmOverloads constructor(
             }
             deferreds.awaitAll()
         }
+    }
+
+    fun send(
+        dest: String,
+        data: String,
+        pid: ByteArray? = null,
+        replyToPid: ByteArray? = null,
+        noReply: Boolean? = false,
+        encrypt: Boolean? = true,
+        msgHoldingSeconds: Int? = this.msgHoldingSeconds
+    ) {
+        var msgPid = pid
+        if (pid == null) {
+            msgPid = Utils.randomBytes(PID_SIZE)
+        }
+        GlobalScope.launch {
+            clients.map { item -> async { item.send(dest, data, msgPid, replyToPid, noReply, encrypt, msgHoldingSeconds) } }.toList()
+        }
+
     }
 
 }

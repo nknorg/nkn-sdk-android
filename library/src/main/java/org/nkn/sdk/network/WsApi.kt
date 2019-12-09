@@ -2,22 +2,21 @@ package org.nkn.sdk.network
 
 import android.util.Log
 import okhttp3.*
-import okhttp3.WebSocketListener
 import okio.ByteString
+import okio.ByteString.Companion.toByteString
 import org.json.JSONObject
 import org.nkn.sdk.ClientListener
 import org.nkn.sdk.configure.*
 import org.nkn.sdk.const.StatusCode
 import org.nkn.sdk.crypto.Key
 import org.nkn.sdk.pb.ClientMessageProto
-import org.nkn.sdk.protocol.newReceipt
+import org.nkn.sdk.pb.PayloadsProto
+import org.nkn.sdk.protocol.*
 import org.nkn.sdk.utils.Utils
 import java.util.*
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.schedule
 import kotlin.random.Random
-import okio.ByteString.Companion.toByteString
-import org.nkn.sdk.pb.PayloadsProto
 
 const val TAG = "WsApi"
 
@@ -26,7 +25,7 @@ class WsApi @JvmOverloads constructor(
     identifier: String?,
     val seedRpcServer: List<String>? = org.nkn.sdk.configure.seed,
     encrypt: Boolean? = ENCRYPT,
-    msgHoldingSeconds: Long? = MSG_HOLDING_SECONDS,
+    val msgHoldingSeconds: Int? = MSG_HOLDING_SECONDS,
     val reconnectIntervalMin: Long? = RECONNECT_INTERVAL_MIN,
     val reconnectIntervalMax: Long? = RECONNECT_INTERVAL_MAX,
     responseTimeout: Long? = RESPONSE_TIMEOUT,
@@ -40,6 +39,7 @@ class WsApi @JvmOverloads constructor(
     val address =
         if (this.identifier.isNullOrEmpty()) "" else "${this.identifier}.${this.key.publicKeyHash}"
     var sigChainBlockHash: String? = null
+    var node: JSONObject? = null
     private val client = OkHttpClient()
     private var shouldReconnect = false
 
@@ -131,7 +131,7 @@ class WsApi @JvmOverloads constructor(
                 } else if (response != null && response != true) {
                     //todo
                 } else {
-                    //todo
+                    this.sendACK(msg.src, payload.pid.toByteArray(), pldMsg.encrypted)
                 }
 
                 return true
@@ -167,23 +167,9 @@ class WsApi @JvmOverloads constructor(
             return
         }
         this.handleConnect(nodeInfo.getString("addr"))
-        Log.d(
-            TAG,
-            "send setClient :${JSONObject(
-                mapOf(
-                    "Action" to "setClient",
-                    "Addr" to this.address
-                )
-            )}"
-        )
-        this.ws!!.send(
-            JSONObject(
-                mapOf(
-                    "Action" to "setClient",
-                    "Addr" to this.address
-                )
-            ).toString()
-        )
+        this.node = nodeInfo
+        Log.d(TAG, "send setClient :${JSONObject(mapOf("Action" to "setClient", "Addr" to this.address))}")
+        this.ws!!.send(JSONObject(mapOf("Action" to "setClient", "Addr" to this.address)).toString())
     }
 
     fun connect() {
@@ -223,8 +209,81 @@ class WsApi @JvmOverloads constructor(
         this.ws?.close(0, null)
     }
 
-    fun sendACK(dest:String, pid: ByteArray, encrypt: Boolean){
-
+    fun messageFromPayload(payload: PayloadsProto.Payload, encrypt: Boolean, dest: String): PayloadsProto.Message {
+        if (encrypt) {
+            val sharedKey = Utils.computeSharedKey(this.curveSecretKey, Utils.convertPublicKey(Utils.getPublicKeyByClientAddr(dest)))
+            return encryptPayload(payload.toByteArray(), dest, sharedKey)
+        }
+        return newMessage(payload.toByteArray(), false)
     }
+
+    fun sendACK(dests: Array<String>, pid: ByteArray, encrypt: Boolean) {
+        // todo multi
+//        if (dest is Array<*>) {
+//            if (dest.size == 0) return
+//            if (dest.size == 1) {
+//                sendACK(dest[0], pid, encrypt)
+//                return
+//            }
+//            if (dest.size > 1 && encrypt) {
+//                Log.i(TAG, "Encrypted ACK with multicast is not supported, fallback to unicast.")
+//                for (i in 0 until dest.size) {
+//                    sendACK(dest[i], pid, encrypt)
+//                }
+//                return
+//            }
+//        }
+    }
+
+    @JvmOverloads
+    fun sendACK(dest: String, pid: ByteArray, encrypt: Boolean) {
+        val payload = newAckPayload(pid, null)
+        val pldMessage = messageFromPayload(payload, encrypt, dest)
+        val obMsg = newOutboundMessage(dest, pldMessage.toByteArray(), 0, this.address, this.key, Utils.hexDecode(this.node!!.getString("pubkey")), this.sigChainBlockHash)
+        this.ws?.send(obMsg.toByteArray().toByteString())
+    }
+
+    fun sendMsg(dest: Any, data: Any, encrypt: Boolean, maxHoldingSeconds: Int, replyToPid: ByteArray?, msgPid: ByteArray?): ByteArray? {
+        var dests: Array<String>? = null
+        if (dest is String) {
+            dests = arrayOf(dest)
+        } else if (dest !is Array<*>) {
+            throw Throwable("dest type must be String or Array<String>")
+        }
+
+        if (dests.isNullOrEmpty()) {
+            throw Throwable("no destination")
+        }
+
+        val payload = if (data is String) newTextPayload(data, replyToPid, msgPid) else newBinaryPayload(data as ByteArray, replyToPid, msgPid)
+        //todo multi
+        val pldMsg = this.messageFromPayload(payload, encrypt, dests[0])
+        val obMsg = newOutboundMessage(
+            dests[0],
+            pldMsg.toByteArray(),
+            this.msgHoldingSeconds!!,
+            this.address,
+            this.key,
+            Utils.hexDecode(this.node!!.getString("pubkey")),
+            this.sigChainBlockHash
+        )
+        this.ws?.send(obMsg.toByteArray().toByteString())
+        return null
+    }
+
+    @JvmOverloads
+    fun send(
+        dest: String,
+        data: String,
+        pid: ByteArray? = null,
+        replyToPid: ByteArray? = null,
+        noReply: Boolean? = false,
+        encrypt: Boolean? = true,
+        msgHoldingSeconds: Int? = this.msgHoldingSeconds
+    ) {
+        this.sendMsg(dest, data, encrypt!!, msgHoldingSeconds!!, replyToPid, pid)
+    }
+
+
 }
 

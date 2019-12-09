@@ -15,6 +15,7 @@ const val UINT160_LEN = 20
 const val CHECKSUM_LEN = 4
 const val ADDRESS_LEN = ADDRESS_GEN_PREFIX_LEN + UINT160_LEN + CHECKSUM_LEN
 const val SEED_LENGTH = 32
+const val NONCE_LENGTH = 24
 const val MAX_UINT_BITS = 48
 const val MAX_UINT = 281474976710656
 
@@ -23,13 +24,13 @@ class Utils {
     companion object {
         @JvmOverloads
         @JvmStatic
-        fun randomByte(len: Int = SEED_LENGTH): ByteArray {
+        fun randomBytes(len: Int = SEED_LENGTH): ByteArray {
             return Random().randomBytes(len)
         }
 
         @JvmStatic
         fun randomInt32(): Int {
-            val b: ByteArray = randomByte(4)
+            val b: ByteArray = randomBytes(4)
             b[0] = (b[0].toInt() and 127).toByte()
             return (b[0].toInt() shl 24) + (b[1].toInt() shl 16) + (b[2].toInt() shl 8) + b[3]
         }

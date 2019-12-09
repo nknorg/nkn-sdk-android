@@ -7,11 +7,11 @@ import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
 fun genAESIV(): ByteArray {
-    return Utils.randomByte(16)
+    return Utils.randomBytes(16)
 }
 
 fun genAESPassword(): ByteArray {
-    return Utils.randomByte(32)
+    return Utils.randomBytes(32)
 }
 
 fun aesEncrypt(

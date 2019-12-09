@@ -148,6 +148,12 @@ public final class PayloadsProto {
      * @return The nonce.
      */
     com.google.protobuf.ByteString getNonce();
+
+    /**
+     * <code>bytes encrypted_key = 4;</code>
+     * @return The encryptedKey.
+     */
+    com.google.protobuf.ByteString getEncryptedKey();
   }
   /**
    * Protobuf type {@code pb.client.Message}
@@ -164,6 +170,7 @@ public final class PayloadsProto {
     private Message() {
       payload_ = com.google.protobuf.ByteString.EMPTY;
       nonce_ = com.google.protobuf.ByteString.EMPTY;
+      encryptedKey_ = com.google.protobuf.ByteString.EMPTY;
     }
 
     @java.lang.Override
@@ -209,6 +216,11 @@ public final class PayloadsProto {
             case 26: {
 
               nonce_ = input.readBytes();
+              break;
+            }
+            case 34: {
+
+              encryptedKey_ = input.readBytes();
               break;
             }
             default: {
@@ -273,6 +285,16 @@ public final class PayloadsProto {
       return nonce_;
     }
 
+    public static final int ENCRYPTED_KEY_FIELD_NUMBER = 4;
+    private com.google.protobuf.ByteString encryptedKey_;
+    /**
+     * <code>bytes encrypted_key = 4;</code>
+     * @return The encryptedKey.
+     */
+    public com.google.protobuf.ByteString getEncryptedKey() {
+      return encryptedKey_;
+    }
+
     private byte memoizedIsInitialized = -1;
     @java.lang.Override
     public final boolean isInitialized() {
@@ -296,6 +318,9 @@ public final class PayloadsProto {
       if (!nonce_.isEmpty()) {
         output.writeBytes(3, nonce_);
       }
+      if (!encryptedKey_.isEmpty()) {
+        output.writeBytes(4, encryptedKey_);
+      }
       unknownFields.writeTo(output);
     }
 
@@ -316,6 +341,10 @@ public final class PayloadsProto {
       if (!nonce_.isEmpty()) {
         size += com.google.protobuf.CodedOutputStream
           .computeBytesSize(3, nonce_);
+      }
+      if (!encryptedKey_.isEmpty()) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeBytesSize(4, encryptedKey_);
       }
       size += unknownFields.getSerializedSize();
       memoizedSize = size;
@@ -338,6 +367,8 @@ public final class PayloadsProto {
           != other.getEncrypted()) return false;
       if (!getNonce()
           .equals(other.getNonce())) return false;
+      if (!getEncryptedKey()
+          .equals(other.getEncryptedKey())) return false;
       if (!unknownFields.equals(other.unknownFields)) return false;
       return true;
     }
@@ -356,6 +387,8 @@ public final class PayloadsProto {
           getEncrypted());
       hash = (37 * hash) + NONCE_FIELD_NUMBER;
       hash = (53 * hash) + getNonce().hashCode();
+      hash = (37 * hash) + ENCRYPTED_KEY_FIELD_NUMBER;
+      hash = (53 * hash) + getEncryptedKey().hashCode();
       hash = (29 * hash) + unknownFields.hashCode();
       memoizedHashCode = hash;
       return hash;
@@ -495,6 +528,8 @@ public final class PayloadsProto {
 
         nonce_ = com.google.protobuf.ByteString.EMPTY;
 
+        encryptedKey_ = com.google.protobuf.ByteString.EMPTY;
+
         return this;
       }
 
@@ -524,6 +559,7 @@ public final class PayloadsProto {
         result.payload_ = payload_;
         result.encrypted_ = encrypted_;
         result.nonce_ = nonce_;
+        result.encryptedKey_ = encryptedKey_;
         onBuilt();
         return result;
       }
@@ -580,6 +616,9 @@ public final class PayloadsProto {
         }
         if (other.getNonce() != com.google.protobuf.ByteString.EMPTY) {
           setNonce(other.getNonce());
+        }
+        if (other.getEncryptedKey() != com.google.protobuf.ByteString.EMPTY) {
+          setEncryptedKey(other.getEncryptedKey());
         }
         this.mergeUnknownFields(other.unknownFields);
         onChanged();
@@ -702,6 +741,39 @@ public final class PayloadsProto {
       public Builder clearNonce() {
         
         nonce_ = getDefaultInstance().getNonce();
+        onChanged();
+        return this;
+      }
+
+      private com.google.protobuf.ByteString encryptedKey_ = com.google.protobuf.ByteString.EMPTY;
+      /**
+       * <code>bytes encrypted_key = 4;</code>
+       * @return The encryptedKey.
+       */
+      public com.google.protobuf.ByteString getEncryptedKey() {
+        return encryptedKey_;
+      }
+      /**
+       * <code>bytes encrypted_key = 4;</code>
+       * @param value The encryptedKey to set.
+       * @return This builder for chaining.
+       */
+      public Builder setEncryptedKey(com.google.protobuf.ByteString value) {
+        if (value == null) {
+    throw new NullPointerException();
+  }
+  
+        encryptedKey_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>bytes encrypted_key = 4;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearEncryptedKey() {
+        
+        encryptedKey_ = getDefaultInstance().getEncryptedKey();
         onChanged();
         return this;
       }
@@ -2156,14 +2228,15 @@ public final class PayloadsProto {
       descriptor;
   static {
     java.lang.String[] descriptorData = {
-      "\n\021pb/payloads.proto\022\tpb.client\"<\n\007Messag" +
+      "\n\021pb/payloads.proto\022\tpb.client\"S\n\007Messag" +
       "e\022\017\n\007payload\030\001 \001(\014\022\021\n\tencrypted\030\002 \001(\010\022\r\n" +
-      "\005nonce\030\003 \001(\014\"p\n\007Payload\022$\n\004type\030\001 \001(\0162\026." +
-      "pb.client.PayloadType\022\013\n\003pid\030\002 \001(\014\022\014\n\004da" +
-      "ta\030\003 \001(\014\022\024\n\014reply_to_pid\030\004 \001(\014\022\016\n\006no_ack" +
-      "\030\005 \001(\010\"\030\n\010TextData\022\014\n\004text\030\001 \001(\t*,\n\013Payl" +
-      "oadType\022\n\n\006BINARY\020\000\022\010\n\004TEXT\020\001\022\007\n\003ACK\020\002B\037" +
-      "\n\016org.nkn.sdk.pbB\rPayloadsProtob\006proto3"
+      "\005nonce\030\003 \001(\014\022\025\n\rencrypted_key\030\004 \001(\014\"p\n\007P" +
+      "ayload\022$\n\004type\030\001 \001(\0162\026.pb.client.Payload" +
+      "Type\022\013\n\003pid\030\002 \001(\014\022\014\n\004data\030\003 \001(\014\022\024\n\014reply" +
+      "_to_pid\030\004 \001(\014\022\016\n\006no_ack\030\005 \001(\010\"\030\n\010TextDat" +
+      "a\022\014\n\004text\030\001 \001(\t*,\n\013PayloadType\022\n\n\006BINARY" +
+      "\020\000\022\010\n\004TEXT\020\001\022\007\n\003ACK\020\002B\037\n\016org.nkn.sdk.pbB" +
+      "\rPayloadsProtob\006proto3"
     };
     descriptor = com.google.protobuf.Descriptors.FileDescriptor
       .internalBuildGeneratedFileFrom(descriptorData,
@@ -2174,7 +2247,7 @@ public final class PayloadsProto {
     internal_static_pb_client_Message_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_pb_client_Message_descriptor,
-        new java.lang.String[] { "Payload", "Encrypted", "Nonce", });
+        new java.lang.String[] { "Payload", "Encrypted", "Nonce", "EncryptedKey", });
     internal_static_pb_client_Payload_descriptor =
       getDescriptor().getMessageTypes().get(1);
     internal_static_pb_client_Payload_fieldAccessorTable = new

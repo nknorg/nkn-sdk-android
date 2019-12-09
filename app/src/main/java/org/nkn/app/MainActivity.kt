@@ -16,6 +16,7 @@ import org.nkn.sdk.Wallet
 import org.nkn.sdk.crypto.Key
 import org.nkn.sdk.network.RpcApi
 import org.nkn.sdk.network.WsApi
+import org.nkn.sdk.utils.Utils
 
 class MainActivity : AppCompatActivity() {
 
@@ -23,22 +24,17 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         setSupportActionBar(toolbar)
+        var client = Client(
+            Utils.hexEncode(Wallet.createRandom().seed),
+            "nkn"
+        )
+        client.connect()
 
         fab.setOnClickListener { view ->
             GlobalScope.launch {
-                //                var wsApi = WsApi("89f5c7fda1ab588c9c690414ceab066648e6af69bc78f7d951688dfd47bbefde", "nknsdk")
-//                wsApi.connect()
-                var client = Client(
-                    "89f5c7fda1ab588c9c690414ceab066648e6af69bc78f7d951688dfd47bbefde",
-                    "nknsdk"
-                )
-                client.connect()
-
+                client.send("heron.25ac590eaca614a0ba4c4387d8514a0b54e948d120c6ff49564e7830c9dec929", """{"contentType":"text","isPrivate":true,"content":"hello"}""")
                 Snackbar.make(view, "res: ", Snackbar.LENGTH_LONG).show()
             }
-
-//            Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-//                .setAction("Action", null).show()
         }
 
 

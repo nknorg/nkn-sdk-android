@@ -1,18 +1,17 @@
 package org.nkn.app
 
 import android.os.Bundle
+import android.util.LruCache
 import com.google.android.material.snackbar.Snackbar
 import androidx.appcompat.app.AppCompatActivity
 import android.view.Menu
 import android.view.MenuItem
 
 import kotlinx.android.synthetic.main.activity_main.*
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.async
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import org.nkn.sdk.Client
 import org.nkn.sdk.Wallet
+import org.nkn.sdk.cache.sharedKeyCache
 import org.nkn.sdk.crypto.Key
 import org.nkn.sdk.network.RpcApi
 import org.nkn.sdk.network.WsApi
@@ -25,14 +24,14 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         setSupportActionBar(toolbar)
         var client = Client(
-            Utils.hexEncode(Wallet.createRandom().seed),
-            "nkn"
+            "2bc5501d131696429264eb7286c44a29dd44dd66834d9471bd8b0eb875a1edb0",
+            "nkn2"
         )
         client.connect()
 
         fab.setOnClickListener { view ->
             GlobalScope.launch {
-                client.send("heron.25ac590eaca614a0ba4c4387d8514a0b54e948d120c6ff49564e7830c9dec929", """{"contentType":"text","isPrivate":true,"content":"hello"}""")
+                client.send("nkn.8488c5ee3010ec45989ffcbf5c74283e23d0f18c4f8e9ea2f6adb1a942dc8d74", """{"contentType":"text","isPrivate":true,"content":"hello"}""")
                 Snackbar.make(view, "res: ", Snackbar.LENGTH_LONG).show()
             }
         }

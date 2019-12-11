@@ -1,6 +1,7 @@
 package org.nkn.sdk
 
 
+import android.util.LruCache
 import org.json.JSONObject
 import org.junit.Assert
 import org.junit.Test
@@ -12,6 +13,6 @@ import org.nkn.sdk.utils.*
 class WalletTest {
     @Test
     fun transfer_test() = runBlocking {
-        println(Utils.hexEncode(encodeUint8(0)))
+
     }
 }

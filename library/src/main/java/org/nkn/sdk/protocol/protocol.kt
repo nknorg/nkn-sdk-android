@@ -7,7 +7,11 @@ import org.nkn.sdk.crypto.sha256Hex
 import org.nkn.sdk.pb.ClientMessageProto
 import org.nkn.sdk.pb.PayloadsProto
 import org.nkn.sdk.pb.SigChainProto
-import org.nkn.sdk.utils.*
+import org.nkn.sdk.utils.Utils
+import org.nkn.sdk.utils.encodeBool
+import org.nkn.sdk.utils.encodeBytes
+import org.nkn.sdk.utils.encodeUint32
+
 
 const val PID_SIZE = 8
 
@@ -46,8 +50,8 @@ fun newClientMessage(messageType: ClientMessageProto.ClientMessageType, message:
     msg.compressionType = compressionType
     msg.message = when (compressionType) {
         ClientMessageProto.CompressionType.COMPRESSION_ZLIB -> {
-            //todo zlib
-            throw Throwable("todo zlib")
+            println("============== COMPRESSION_ZLIB =============")
+            ByteString.copyFrom(compress(message))
         }
         ClientMessageProto.CompressionType.COMPRESSION_NONE -> ByteString.copyFrom(message)
         else -> throw Throwable("unknown compression type $compressionType")
@@ -67,12 +71,15 @@ fun newReceipt(prevSignature: ByteArray, key: Key): ClientMessageProto.ClientMes
     return newClientMessage(ClientMessageProto.ClientMessageType.RECEIPT, msg.build().toByteArray(), ClientMessageProto.CompressionType.COMPRESSION_NONE)
 }
 
-fun newMessage(payload: ByteArray, encrypted: Boolean, nonce: ByteArray? = null): PayloadsProto.Message {
+fun newMessage(payload: ByteArray, encrypted: Boolean, nonce: ByteArray? = null, encryptedKey: ByteArray? = null): PayloadsProto.Message {
     val msg = PayloadsProto.Message.newBuilder()
     msg.payload = ByteString.copyFrom(payload)
     msg.encrypted = encrypted
-    if (encrypted) {
+    if (nonce != null) {
         msg.nonce = ByteString.copyFrom(nonce)
+    }
+    if (encryptedKey != null) {
+        msg.encryptedKey = ByteString.copyFrom(encryptedKey)
     }
     return msg.build()
 }
@@ -100,10 +107,12 @@ fun newOutboundMessage(
     pubkey: ByteArray,
     sigChainBlockHash: String? = null
 ): ClientMessageProto.ClientMessage {
-    var dests: Array<String>? = null
+    var dests: Array<String>
     if (dest is String) {
         dests = arrayOf(dest)
-    } else if (dest !is Array<*>) {
+    } else if (dest is Array<*>) {
+        dests = dest as Array<String>
+    } else {
         throw Throwable("dest type must be String or Array<String>")
     }
 
@@ -111,10 +120,12 @@ fun newOutboundMessage(
         throw Throwable("no destination")
     }
 
-    var payloads: Array<ByteArray>? = null
+    var payloads: Array<ByteArray>
     if (payload is ByteArray) {
         payloads = arrayOf(payload)
-    } else if (payload !is Array<*>) {
+    } else if (payload is Array<*>) {
+        payloads = payload as Array<ByteArray>
+    } else {
         throw Throwable("payload type must be String or Array<ByteArray>")
     }
     if (payloads.isNullOrEmpty()) {
@@ -123,7 +134,6 @@ fun newOutboundMessage(
     if (payloads.size > 1 && payloads.size != dests.size) {
         throw Throwable("invalid payload count")
     }
-
 
     val sigChainElem = SigChainProto.SigChainElem.newBuilder()
     sigChainElem.nextPubkey = ByteString.copyFrom(pubkey)

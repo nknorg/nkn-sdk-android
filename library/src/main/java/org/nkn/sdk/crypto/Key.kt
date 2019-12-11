@@ -5,14 +5,14 @@ import org.libsodium.jni.Sodium
 import org.libsodium.jni.crypto.Random
 import org.libsodium.jni.encoders.Encoder.HEX
 import org.libsodium.jni.keys.SigningKey
+import org.nkn.sdk.cache.sharedKeyCache
+import org.nkn.sdk.const.PUBLICKEY_SIZE
+import org.nkn.sdk.const.SECRET_KEY_SIZE
+import org.nkn.sdk.const.SEED_SIZE
 import org.nkn.sdk.utils.Utils
 
-const val SEED_SIZE: Int = 32
-const val SECRET_KEY_SIZE: Int = 64
-const val PUBLICKEY_SIZE: Int = 32
-const val SHARED_SIZE: Int = 32
 
-class Key {
+class Key(seed: Any?) {
     var seed: ByteArray
     val privateKey: ByteArray
     val publicKey: ByteArray
@@ -21,11 +21,11 @@ class Key {
     val publicKeyHash: String
     val signatureRedeem: String
     val programHash: String
+    val curveSecretKey: ByteArray
     private var signingKey: SigningKey
 
-    constructor(seed: Any?) {
+    init {
         NaCl.sodium()
-
         if (seed is ByteArray) {
             Utils.checkLength(seed, SEED_SIZE)
             this.seed = seed
@@ -35,7 +35,6 @@ class Key {
         } else {
             this.seed = Random().randomBytes()
         }
-
         this.privateKey = ByteArray(SECRET_KEY_SIZE)
         this.publicKey = ByteArray(PUBLICKEY_SIZE)
         Sodium.crypto_sign_ed25519_seed_keypair(this.publicKey, this.privateKey, this.seed)
@@ -44,12 +43,27 @@ class Key {
         this.signatureRedeem = Utils.publicKeyToSignatureRedeem(publicKeyHash)
         this.programHash = Utils.hexStringToProgramHash(signatureRedeem)
         this.signingKey = SigningKey(this.seed)
+        curveSecretKey = Utils.convertSecretKey(this.privateKey)
     }
 
+    fun getCacheSharedKeyByTargetPubKey(pk: ByteArray): ByteArray {
+        var sharedKey = sharedKeyCache.get(pk)
+        if (sharedKey == null) {
+            sharedKey = Utils.computeSharedKey(this.curveSecretKey, Utils.convertPublicKey(pk))
+            sharedKeyCache.put(pk, sharedKey)
+        }
+        return sharedKey
+    }
 
     fun sign(message: ByteArray): ByteArray {
         return this.signingKey.sign(message)
     }
 
+    fun encrypt(message: ByteArray, nonce: ByteArray, otherPubKey: ByteArray): ByteArray? {
+        return Utils.encrypt(message, nonce, getCacheSharedKeyByTargetPubKey(otherPubKey))
+    }
 
+    fun decrypt(encryptedMessage: ByteArray, nonce: ByteArray, otherPubKey: ByteArray): ByteArray? {
+        return Utils.decrypt(encryptedMessage, nonce, getCacheSharedKeyByTargetPubKey(otherPubKey))
+    }
 }

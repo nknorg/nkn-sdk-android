@@ -6,6 +6,10 @@ import org.libsodium.jni.Sodium
 import org.libsodium.jni.crypto.Random
 import org.libsodium.jni.crypto.SecretBox
 import org.libsodium.jni.encoders.Hex.HEX
+import org.nkn.sdk.const.PUBLICKEY_SIZE
+import org.nkn.sdk.const.SECRET_KEY_SIZE
+import org.nkn.sdk.const.SEED_SIZE
+import org.nkn.sdk.const.SHARED_SIZE
 import org.nkn.sdk.crypto.*
 
 
@@ -14,17 +18,13 @@ const val ADDRESS_GEN_PREFIX_LEN: Int = ADDRESS_GEN_PREFIX.length / 2
 const val UINT160_LEN = 20
 const val CHECKSUM_LEN = 4
 const val ADDRESS_LEN = ADDRESS_GEN_PREFIX_LEN + UINT160_LEN + CHECKSUM_LEN
-const val SEED_LENGTH = 32
-const val NONCE_LENGTH = 24
-const val MAX_UINT_BITS = 48
-const val MAX_UINT = 281474976710656
 
 
 class Utils {
     companion object {
         @JvmOverloads
         @JvmStatic
-        fun randomBytes(len: Int = SEED_LENGTH): ByteArray {
+        fun randomBytes(len: Int = SEED_SIZE): ByteArray {
             return Random().randomBytes(len)
         }
 
@@ -175,12 +175,12 @@ class Utils {
         }
 
         @JvmStatic
-        fun decrypt(encrypted: ByteArray, nonce: ByteArray, key: ByteArray): ByteArray {
+        fun decrypt(encrypted: ByteArray, nonce: ByteArray, key: ByteArray): ByteArray? {
             return SecretBox(key).decrypt(nonce, encrypted)
         }
 
         @JvmStatic
-        fun encrypt(message: ByteArray, nonce: ByteArray, key: ByteArray): ByteArray {
+        fun encrypt(message: ByteArray, nonce: ByteArray, key: ByteArray): ByteArray? {
             return SecretBox(key).encrypt(nonce, message)
         }
     }

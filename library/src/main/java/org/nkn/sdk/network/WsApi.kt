@@ -7,6 +7,7 @@ import okio.ByteString.Companion.toByteString
 import org.json.JSONObject
 import org.nkn.sdk.ClientListener
 import org.nkn.sdk.configure.*
+import org.nkn.sdk.const.SIGNATURE_SIZE
 import org.nkn.sdk.const.StatusCode
 import org.nkn.sdk.crypto.Key
 import org.nkn.sdk.pb.ClientMessageProto
@@ -15,10 +16,13 @@ import org.nkn.sdk.protocol.*
 import org.nkn.sdk.utils.Utils
 import java.util.*
 import java.util.concurrent.TimeUnit
+import kotlin.collections.ArrayList
 import kotlin.concurrent.schedule
 import kotlin.random.Random
 
 const val TAG = "WsApi"
+
+const val MAX_CLIENT_MESSAGE_SIZE = 4000000
 
 class WsApi @JvmOverloads constructor(
     seed: String,
@@ -37,9 +41,10 @@ class WsApi @JvmOverloads constructor(
     val curveSecretKey = Utils.convertSecretKey(key.privateKey)
     val identifier: String = identifier ?: ""
     val address =
-        if (this.identifier.isNullOrEmpty()) "" else "${this.identifier}.${this.key.publicKeyHash}"
+        if (this.identifier.isNullOrEmpty()) this.key.publicKeyHash else "${this.identifier}.${this.key.publicKeyHash}"
     var sigChainBlockHash: String? = null
     var node: JSONObject? = null
+    var isReadly = false
     private val client = OkHttpClient()
     private var shouldReconnect = false
 
@@ -62,11 +67,12 @@ class WsApi @JvmOverloads constructor(
             when (message.getString("Action")) {
                 "setClient" -> {
                     sigChainBlockHash = message.getJSONObject("Result").getString("sigChainBlockHash")
+                    isReadly = true
                     listener?.onConnect()
                 }
                 "updateSigChainBlockHash" -> sigChainBlockHash = message.getString("Result")
                 "sendRawBlock" -> listener?.onBlock()
-                else -> Log.e(TAG, "Unknown msg type: ${message.getString("Action")}")
+                else -> Log.e(TAG, "Unknown msg type: $message")
             }
 
         }
@@ -93,6 +99,7 @@ class WsApi @JvmOverloads constructor(
         }
     }
 
+
     fun handleInboundMsg(raw: ByteArray): Boolean {
         val msg = ClientMessageProto.InboundMessage.parseFrom(raw)
         if (msg.prevSignature.size() > 0) {
@@ -100,16 +107,13 @@ class WsApi @JvmOverloads constructor(
             this.ws?.send(receipt.toByteArray().toByteString())
         }
         val pldMsg = PayloadsProto.Message.parseFrom(msg.payload)
-        var rawPayload = pldMsg.payload.toByteArray()
-        if (pldMsg.encrypted) {
-            val sharedKey = Utils.computeSharedKey(this.curveSecretKey, Utils.convertPublicKey(Utils.getPublicKeyByClientAddr(msg.src)))
-            rawPayload = Utils.decrypt(pldMsg.payload.toByteArray(), pldMsg.nonce.toByteArray(), sharedKey)
-            if (rawPayload.isEmpty()) {
-                throw Throwable("Decrypt message failed.")
-            }
+        val pldBytes = if (pldMsg.encrypted) {
+            decryptPayload(pldMsg, Utils.getPublicKeyByClientAddr(msg.src), key)
+        } else {
+            pldMsg.payload.toByteArray()
         }
 
-        val payload = PayloadsProto.Payload.parseFrom(rawPayload)
+        val payload = PayloadsProto.Payload.parseFrom(pldBytes)
         var data: String? = null
         when (payload.type) {
             PayloadsProto.PayloadType.TEXT -> {
@@ -128,8 +132,8 @@ class WsApi @JvmOverloads constructor(
                 Log.d(TAG, """addr: $address, response: $response""")
                 if (response is Boolean && !response) {
                     return false
-                } else if (response != null && response != true) {
-                    //todo
+                } else if (response != null && response is String) {
+                    this.send(msg.src, response, replyToPid = payload.pid.toByteArray(), encrypt = pldMsg.encrypted, msgHoldingSeconds = 0, noReply = true)
                 } else {
                     this.sendACK(msg.src, payload.pid.toByteArray(), pldMsg.encrypted)
                 }
@@ -175,17 +179,18 @@ class WsApi @JvmOverloads constructor(
     fun connect() {
         val rpcAddr = seedRpcServer?.get(Random.nextInt(0, seedRpcServer.size))
         val rpcApi = RpcApi(rpcAddr)
-        val nodeInfo = rpcApi.getWsAddr(address)
-        if (nodeInfo == null) {
-            Log.e(TAG, "get ws addr is null")
-            this.reconnect()
-            return
-        }
+
         try {
+            val nodeInfo = rpcApi.getWsAddr(address)
+            if (nodeInfo == null) {
+                Log.e(TAG, "get ws addr is null")
+                this.connect()
+                return
+            }
             this.createWebSocketConnection(nodeInfo)
         } catch (e: Throwable) {
             Log.e(TAG, "RPC call failed, $e")
-            this.reconnect()
+            this.connect()
         }
     }
 
@@ -211,10 +216,13 @@ class WsApi @JvmOverloads constructor(
 
     fun messageFromPayload(payload: PayloadsProto.Payload, encrypt: Boolean, dest: String): PayloadsProto.Message {
         if (encrypt) {
-            val sharedKey = Utils.computeSharedKey(this.curveSecretKey, Utils.convertPublicKey(Utils.getPublicKeyByClientAddr(dest)))
-            return encryptPayload(payload.toByteArray(), dest, sharedKey)
+            return encryptPayload(payload.toByteArray(), dest, key)
         }
         return newMessage(payload.toByteArray(), false)
+    }
+
+    fun messageFromPayloads(payload: PayloadsProto.Payload, encrypt: Boolean, dests: Array<String>): Array<PayloadsProto.Message> {
+        return encryptPayloads(payload.toByteArray(), dests, key)
     }
 
     fun sendACK(dests: Array<String>, pid: ByteArray, encrypt: Boolean) {
@@ -243,31 +251,81 @@ class WsApi @JvmOverloads constructor(
         this.ws?.send(obMsg.toByteArray().toByteString())
     }
 
-    fun sendMsg(dest: Any, data: Any, encrypt: Boolean, maxHoldingSeconds: Int, replyToPid: ByteArray?, msgPid: ByteArray?): ByteArray? {
-        var dests: Array<String>? = null
-        if (dest is String) {
-            dests = arrayOf(dest)
-        } else if (dest !is Array<*>) {
-            throw Throwable("dest type must be String or Array<String>")
+    fun sendMsg(dests: Any, data: Any, encrypt: Boolean, maxHoldingSeconds: Int, replyToPid: ByteArray?, msgPid: ByteArray?): ByteArray? {
+        if (!isReadly) {
+            return null
         }
-
-        if (dests.isNullOrEmpty()) {
-            throw Throwable("no destination")
-        }
-
         val payload = if (data is String) newTextPayload(data, replyToPid, msgPid) else newBinaryPayload(data as ByteArray, replyToPid, msgPid)
-        //todo multi
-        val pldMsg = this.messageFromPayload(payload, encrypt, dests[0])
-        val obMsg = newOutboundMessage(
-            dests[0],
-            pldMsg.toByteArray(),
-            this.msgHoldingSeconds!!,
-            this.address,
-            this.key,
-            Utils.hexDecode(this.node!!.getString("pubkey")),
-            this.sigChainBlockHash
-        )
-        this.ws?.send(obMsg.toByteArray().toByteString())
+        when (dests) {
+            is String -> {
+                val pldMsg = this.messageFromPayload(payload, encrypt, dests)
+                val obMsg = newOutboundMessage(
+                    dests,
+                    pldMsg.toByteArray(),
+                    maxHoldingSeconds,
+                    this.address,
+                    this.key,
+                    Utils.hexDecode(this.node!!.getString("pubkey")),
+                    this.sigChainBlockHash
+                )
+                this.ws?.send(obMsg.toByteArray().toByteString())
+                return payload.pid.toByteArray()
+            }
+            is Array<*> -> {
+                val pldMsg = this.messageFromPayloads(payload, encrypt, dests as Array<String>)
+                val msgs: ArrayList<ClientMessageProto.ClientMessage> = ArrayList()
+                var destList: ArrayList<String> = ArrayList()
+                var pldList: ArrayList<ByteArray> = ArrayList()
+                var totalSize = 0
+                for (i in pldMsg.indices) {
+                    val size = pldMsg[i].toByteArray().size + dests[i].length + SIGNATURE_SIZE
+                    if (size > MAX_CLIENT_MESSAGE_SIZE) {
+                        throw Throwable("message size is greater than $MAX_CLIENT_MESSAGE_SIZE bytes")
+                    }
+                    if (totalSize + size > MAX_CLIENT_MESSAGE_SIZE) {
+                        msgs.add(
+                            newOutboundMessage(
+                                destList.toTypedArray(),
+                                pldList.toTypedArray(),
+                                maxHoldingSeconds,
+                                this.address,
+                                this.key,
+                                Utils.hexDecode(this.node!!.getString("pubkey")),
+                                this.sigChainBlockHash
+                            )
+                        )
+                        destList = ArrayList()
+                        pldList = ArrayList()
+                        totalSize = 0
+                    }
+                    destList.add(dests[i])
+                    pldList.add(pldMsg[i].toByteArray())
+                    totalSize += size
+                }
+
+                msgs.add(
+                    newOutboundMessage(
+                        destList.toTypedArray(),
+                        pldList.toTypedArray(),
+                        maxHoldingSeconds,
+                        this.address,
+                        this.key,
+                        Utils.hexDecode(this.node!!.getString("pubkey")),
+                        this.sigChainBlockHash
+                    )
+                )
+
+                if (msgs.size > 1) {
+                    Log.i(TAG, "Client message size is greater than ${MAX_CLIENT_MESSAGE_SIZE} bytes, split into ${msgs.size} batches.")
+                }
+                msgs.forEach { msg -> this.ws?.send(msg.toByteArray().toByteString()) }
+                return payload.pid.toByteArray()
+            }
+            else -> {
+                throw Throwable("dest type must be String or Array<String>")
+            }
+        }
+
         return null
     }
 
@@ -284,6 +342,30 @@ class WsApi @JvmOverloads constructor(
         this.sendMsg(dest, data, encrypt!!, msgHoldingSeconds!!, replyToPid, pid)
     }
 
+    @JvmOverloads
+    fun send(
+        dests: Array<String>,
+        data: String,
+        pid: ByteArray? = null,
+        replyToPid: ByteArray? = null,
+        noReply: Boolean? = false,
+        encrypt: Boolean? = true,
+        msgHoldingSeconds: Int? = this.msgHoldingSeconds
+    ) {
+        this.sendMsg(dests, data, encrypt!!, msgHoldingSeconds!!, replyToPid, pid)
+    }
 
+//    @JvmOverloads
+//    fun send(
+//        dests: Array<String>,
+//        data: Array<String>,
+//        pid: ByteArray? = null,
+//        replyToPid: ByteArray? = null,
+//        noReply: Boolean? = false,
+//        encrypt: Boolean = true,
+//        msgHoldingSeconds: Int? = this.msgHoldingSeconds
+//    ) {
+//
+//    }
 }
 

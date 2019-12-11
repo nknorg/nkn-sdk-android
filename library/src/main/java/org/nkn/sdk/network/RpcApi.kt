@@ -6,8 +6,7 @@ import org.json.JSONObject
 import org.nkn.sdk.configure.RPC_ADDR
 import org.nkn.sdk.error.RpcError
 import org.nkn.sdk.error.RpcErrorCode
-import kotlinx.coroutines.*
-import org.json.JSONTokener
+
 
 class RpcApi(val rpcAddr: String? = null) {
     constructor() : this(RPC_ADDR)
@@ -61,7 +60,8 @@ class RpcApi(val rpcAddr: String? = null) {
     }
 
     fun getWsAddr(address: String): JSONObject? {
-        return this.request("getwsaddr", mapOf("address" to address))?.getJSONObject("result")
+        val res = this.request("getwsaddr", mapOf("address" to address))
+        return if (res != null && res.has("result")) res.getJSONObject("result") else null
     }
 
     fun getSubscribers(

@@ -112,10 +112,12 @@ class Client @JvmOverloads constructor(
         }
 
         override fun onClosed() {
+            multiClientCache.remove(hashCode.toString())
             listener?.onClosed()
         }
 
         override fun onError(e: Throwable) {
+            multiClientCache.remove(hashCode.toString())
             listener?.onError(e)
         }
 

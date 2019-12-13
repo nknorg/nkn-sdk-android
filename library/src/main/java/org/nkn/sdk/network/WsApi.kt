@@ -58,7 +58,7 @@ class WsApi @JvmOverloads constructor(
             val message = JSONObject(text)
             if (message.has("Error") && message.getInt("Error") != StatusCode.SUCCESS.code) {
                 if (message.getInt("Error") == StatusCode.WRONG_NODE.code) {
-                    if(message.getJSONObject("Result").getString("addr") == node!!.getString("addr"))
+                    if (message.getJSONObject("Result").getString("addr") == node!!.getString("addr"))
                         return
                     close()
                     ws = null
@@ -94,12 +94,14 @@ class WsApi @JvmOverloads constructor(
 
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
             Log.d(TAG, """"addr: $address, WebSocket listener "onClosed", code: $code, reason: $reason""")
-            if (shouldReconnect) reconnect() else listener?.onClosed()
+            listener?.onClosed()
+            if (shouldReconnect) reconnect()
         }
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
             Log.d(TAG, """"addr: $address, WebSocket listener "onFailure", error: $t, reason: $response""")
-            if (shouldReconnect) reconnect() else listener?.onError(t)
+            listener?.onError(t)
+            if (shouldReconnect) reconnect()
         }
     }
 
@@ -167,6 +169,7 @@ class WsApi @JvmOverloads constructor(
             .pingInterval(10, TimeUnit.SECONDS)
             .build().newWebSocket(request, WsListener())
         this.shouldReconnect = true
+        this.reconnectInterval = this.reconnectIntervalMin!!
     }
 
     fun createWebSocketConnection(nodeInfo: JSONObject) {
@@ -189,13 +192,13 @@ class WsApi @JvmOverloads constructor(
             val nodeInfo = rpcApi.getWsAddr(address)
             if (nodeInfo == null) {
                 Log.e(TAG, "get ws addr is null")
-                this.connect()
+                this.reconnect()
                 return
             }
             this.createWebSocketConnection(nodeInfo)
         } catch (e: Throwable) {
             Log.e(TAG, "RPC call failed, $e")
-            this.connect()
+            this.reconnect()
         }
     }
 

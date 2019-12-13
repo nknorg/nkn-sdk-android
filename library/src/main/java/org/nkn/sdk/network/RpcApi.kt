@@ -47,8 +47,12 @@ class RpcApi(val rpcAddr: String? = null) {
         return this.request("getnoncebyaddr", mapOf("address" to address))?.getJSONObject("result")
     }
 
-    fun getBlockCount(name: String): JSONObject? {
-        return this.request("getblockcount", mapOf("name" to name))?.getJSONObject("result")
+    fun getBlockCount(): Long? {
+        return this.request("getblockcount", mapOf())?.getLong("result")
+    }
+
+    fun getLatestBlockHeight(): Long?{
+        return this.request("getlatestblockheight", mapOf())?.getLong("result")
     }
 
     fun getAddressByName(name: String): JSONObject? {

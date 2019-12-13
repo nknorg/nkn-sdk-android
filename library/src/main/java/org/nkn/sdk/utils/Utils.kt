@@ -1,6 +1,5 @@
 package org.nkn.sdk.utils
 
-import okhttp3.internal.toHexString
 import org.libsodium.jni.NaCl
 import org.libsodium.jni.Sodium
 import org.libsodium.jni.crypto.Random
@@ -85,7 +84,7 @@ class Utils {
                 len += 1
             }
 
-            var byteCount = (len / 2).toHexString()
+            var byteCount = (len / 2).toString(16)
 
             if (1 == byteCount.length % 2) {
                 byteCount = "0$byteCount"

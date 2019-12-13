@@ -1,7 +1,7 @@
 package org.nkn.sdk.network
 
 import okhttp3.*
-import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.RequestBody
 import org.json.JSONObject
 import org.nkn.sdk.configure.RPC_ADDR
 import org.nkn.sdk.error.RpcError
@@ -23,15 +23,15 @@ class RpcApi(val rpcAddr: String? = null) {
 
         val request = Request.Builder()
             .url(url!!)
-            .post(JSONObject(body.toMap()).toString().toRequestBody())
+            .post(RequestBody.create(null, JSONObject(body.toMap()).toString()))
             .build()
 
         val res = client.newCall(request).execute()
 
-        if (res.code != 200) {
+        if (res.code() != 200) {
             throw RpcError(RpcErrorCode.UNKNOWN_ERROR, RpcError.UNKNOWN_ERROR)
         }
-        val json = JSONObject(res.body!!.string())
+        val json = JSONObject(res.body()!!.string())
 
         if (json.has("error"))
             return json.getJSONObject("error")

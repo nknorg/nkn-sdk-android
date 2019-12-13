@@ -3,7 +3,6 @@ package org.nkn.sdk.network
 import android.util.Log
 import okhttp3.*
 import okio.ByteString
-import okio.ByteString.Companion.toByteString
 import org.json.JSONObject
 import org.nkn.sdk.ClientListener
 import org.nkn.sdk.configure.*
@@ -14,6 +13,7 @@ import org.nkn.sdk.pb.ClientMessageProto
 import org.nkn.sdk.pb.PayloadsProto
 import org.nkn.sdk.protocol.*
 import org.nkn.sdk.utils.Utils
+import java.nio.ByteBuffer
 import java.util.*
 import java.util.concurrent.TimeUnit
 import kotlin.collections.ArrayList
@@ -56,11 +56,15 @@ class WsApi @JvmOverloads constructor(
         override fun onMessage(webSocket: WebSocket, text: String) {
             Log.d(TAG, """"addr: $address, WebSocket listener "onMessage", text: $text""")
             val message = JSONObject(text)
-            if (!message.has("Error") && message.getInt("Error") == StatusCode.SUCCESS.code) {
+            if (message.has("Error") && message.getInt("Error") != StatusCode.SUCCESS.code) {
                 if (message.getInt("Error") == StatusCode.WRONG_NODE.code) {
+                    if(message.getJSONObject("Result").getString("addr") == node!!.getString("addr"))
+                        return
+                    close()
+                    ws = null
                     createWebSocketConnection(message.getJSONObject("Result"))
                 } else if (message.getString("Action") == "setClient") {
-                    ws?.close(0, null)
+                    ws?.close(1000, null)
                 }
                 return
             }
@@ -78,7 +82,7 @@ class WsApi @JvmOverloads constructor(
         }
 
         override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
-            Log.d(TAG, """"addr: $address, WebSocket listener "onBinaryMessage", bytes: ${bytes.size}""")
+            Log.d(TAG, """"addr: $address, WebSocket listener "onBinaryMessage", bytes: ${bytes.size()}""")
             val handled = handleBinaryMessage(bytes.toByteArray())
             if (!handled) Log.d(TAG, "Unhandled msg")
         }
@@ -104,7 +108,7 @@ class WsApi @JvmOverloads constructor(
         val msg = ClientMessageProto.InboundMessage.parseFrom(raw)
         if (msg.prevSignature.size() > 0) {
             var receipt = newReceipt(msg.prevSignature.toByteArray(), key)
-            this.ws?.send(receipt.toByteArray().toByteString())
+            this.ws?.send(ByteString.of(ByteBuffer.wrap(receipt.toByteArray())))
         }
         val pldMsg = PayloadsProto.Message.parseFrom(msg.payload)
         val pldBytes = if (pldMsg.encrypted) {
@@ -154,6 +158,7 @@ class WsApi @JvmOverloads constructor(
     }
 
     fun handleConnect(url: String) {
+        Log.d(TAG, "addr: $address, connect to ws://$url")
         val request = Request.Builder()
             .url("ws://$url")
             .build()
@@ -170,8 +175,8 @@ class WsApi @JvmOverloads constructor(
             this.reconnect()
             return
         }
-        this.handleConnect(nodeInfo.getString("addr"))
         this.node = nodeInfo
+        this.handleConnect(nodeInfo.getString("addr"))
         Log.d(TAG, "send setClient :${JSONObject(mapOf("Action" to "setClient", "Addr" to this.address))}")
         this.ws!!.send(JSONObject(mapOf("Action" to "setClient", "Addr" to this.address)).toString())
     }
@@ -211,7 +216,7 @@ class WsApi @JvmOverloads constructor(
 
     fun close() {
         this.shouldReconnect = false
-        this.ws?.close(0, null)
+        this.ws?.close(1000, null)
     }
 
     fun messageFromPayload(payload: PayloadsProto.Payload, encrypt: Boolean, dest: String): PayloadsProto.Message {
@@ -248,7 +253,7 @@ class WsApi @JvmOverloads constructor(
         val payload = newAckPayload(pid, null)
         val pldMessage = messageFromPayload(payload, encrypt, dest)
         val obMsg = newOutboundMessage(dest, pldMessage.toByteArray(), 0, this.address, this.key, Utils.hexDecode(this.node!!.getString("pubkey")), this.sigChainBlockHash)
-        this.ws?.send(obMsg.toByteArray().toByteString())
+        this.ws?.send(ByteString.of(ByteBuffer.wrap(obMsg.toByteArray())))
     }
 
     fun sendMsg(dests: Any, data: Any, encrypt: Boolean, maxHoldingSeconds: Int, replyToPid: ByteArray?, msgPid: ByteArray?): ByteArray? {
@@ -268,7 +273,7 @@ class WsApi @JvmOverloads constructor(
                     Utils.hexDecode(this.node!!.getString("pubkey")),
                     this.sigChainBlockHash
                 )
-                this.ws?.send(obMsg.toByteArray().toByteString())
+                this.ws?.send(ByteString.of(ByteBuffer.wrap(obMsg.toByteArray())))
                 return payload.pid.toByteArray()
             }
             is Array<*> -> {
@@ -318,7 +323,7 @@ class WsApi @JvmOverloads constructor(
                 if (msgs.size > 1) {
                     Log.i(TAG, "Client message size is greater than ${MAX_CLIENT_MESSAGE_SIZE} bytes, split into ${msgs.size} batches.")
                 }
-                msgs.forEach { msg -> this.ws?.send(msg.toByteArray().toByteString()) }
+                msgs.forEach { msg -> this.ws?.send(ByteString.of(ByteBuffer.wrap(msg.toByteArray()))) }
                 return payload.pid.toByteArray()
             }
             else -> {

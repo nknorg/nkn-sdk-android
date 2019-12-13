@@ -1,7 +1,6 @@
 package org.nkn.app
 
 import android.os.Bundle
-import android.util.LruCache
 import com.google.android.material.snackbar.Snackbar
 import androidx.appcompat.app.AppCompatActivity
 import android.view.Menu
@@ -24,14 +23,14 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         setSupportActionBar(toolbar)
         var client = Client(
-            "2bc5501d131696429264eb7286c44a29dd44dd66834d9471bd8b0eb875a1edb0",
-            "nkn2"
+            "32e677190540797d3252e09bea9a03d2e286a74ad54bffcba6378481c6e3e9cd",
+            "nkn"
         )
         client.connect()
 
         fab.setOnClickListener { view ->
             GlobalScope.launch {
-                client.send("nkn.8488c5ee3010ec45989ffcbf5c74283e23d0f18c4f8e9ea2f6adb1a942dc8d74", """{"contentType":"text","isPrivate":true,"content":"hello"}""")
+//                client.send("nkn.8488c5ee3010ec45989ffcbf5c74283e23d0f18c4f8e9ea2f6adb1a942dc8d74", """{"contentType":"text","isPrivate":true,"content":"hello"}""")
                 Snackbar.make(view, "res: ", Snackbar.LENGTH_LONG).show()
             }
         }

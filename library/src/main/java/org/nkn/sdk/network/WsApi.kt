@@ -32,7 +32,7 @@ class WsApi @JvmOverloads constructor(
     val msgHoldingSeconds: Int? = MSG_HOLDING_SECONDS,
     val reconnectIntervalMin: Long? = RECONNECT_INTERVAL_MIN,
     val reconnectIntervalMax: Long? = RECONNECT_INTERVAL_MAX,
-    responseTimeout: Long? = RESPONSE_TIMEOUT,
+    val responseTimeout: Int? = RESPONSE_TIMEOUT,
     var listener: ClientListener? = null
 ) {
     var ws: WebSocket? = null
@@ -167,6 +167,7 @@ class WsApi @JvmOverloads constructor(
 
         this.ws = client.newBuilder()
             .pingInterval(10, TimeUnit.SECONDS)
+            .callTimeout(responseTimeout!!.toLong(), TimeUnit.SECONDS)
             .build().newWebSocket(request, WsListener())
         this.shouldReconnect = true
         this.reconnectInterval = this.reconnectIntervalMin!!

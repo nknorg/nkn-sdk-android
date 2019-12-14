@@ -37,7 +37,7 @@ class Client @JvmOverloads constructor(
     val msgHoldingSeconds: Int? = MSG_HOLDING_SECONDS,
     val reconnectIntervalMin: Long? = RECONNECT_INTERVAL_MIN,
     val reconnectIntervalMax: Long? = RECONNECT_INTERVAL_MAX,
-    responseTimeout: Long? = RESPONSE_TIMEOUT,
+    responseTimeout: Int? = RESPONSE_TIMEOUT,
     numSubClients: Int? = 3,
     var listener: ClientListener? = null,
     msgCacheExpire: Long? = 30000
@@ -157,7 +157,7 @@ class Client @JvmOverloads constructor(
     fun close() {
         GlobalScope.launch {
             for (i in clients) {
-                clients.map { item -> async { item.close() } }
+                clients.map { item -> launch { item.close() } }
             }
         }
     }
@@ -176,9 +176,7 @@ class Client @JvmOverloads constructor(
             msgPid = Utils.randomBytes(PID_SIZE)
         }
         if (isReadly) {
-            GlobalScope.launch {
-                clients.map { item -> async { item.send(getIdentifierPrefix(item.address) + dest, data, msgPid, replyToPid, noReply, encrypt, msgHoldingSeconds) } }
-            }
+            clients.map { item -> item.send(getIdentifierPrefix(item.address) + dest, data, msgPid, replyToPid, noReply, encrypt, msgHoldingSeconds) }
         } else {
             //todo await connect
             throw Throwable("not connected yet")
@@ -199,21 +197,18 @@ class Client @JvmOverloads constructor(
             msgPid = Utils.randomBytes(PID_SIZE)
         }
         if (isReadly) {
-            GlobalScope.launch {
-                for (i in clients.indices) {
-                    async {
-                        clients[i].send(
-                            dests.map { dest -> getIdentifierPrefix(clients[i].address) + dest }.toTypedArray(),
-                            data,
-                            msgPid,
-                            replyToPid,
-                            noReply,
-                            encrypt,
-                            msgHoldingSeconds
-                        )
-                    }
-                }
+            for (i in clients.indices) {
+                clients[i].send(
+                    dests.map { dest -> getIdentifierPrefix(clients[i].address) + dest }.toTypedArray(),
+                    data,
+                    msgPid,
+                    replyToPid,
+                    noReply,
+                    encrypt,
+                    msgHoldingSeconds
+                )
             }
+
         } else {
             //todo await connect
             throw Throwable("not connected yet")

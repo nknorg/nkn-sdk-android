@@ -185,7 +185,7 @@ class Wallet(
     fun transferTo(
         toAddress: String,
         amount: Double,
-        fee: Long = 0,
+        fee: Double = 0.0,
         nonce: Long? = null,
         attrs: String = ""
     ): String? {
@@ -215,12 +215,12 @@ class Wallet(
         identifier: String? = "",
         meta: String? = "",
         nonce: Long? = null,
-        fee: Long? = 0,
+        fee: Double? = 0.0,
         attrs: String? = ""
     ): String? {
         val nextNonce = nonce ?: this.getNonce() ?: 0
         val pld = newSubscribe(this.publicKeyHash, identifier ?: "", topic, duration, meta ?: "")
-        val txn = newTransaction(this.account, pld, nextNonce, fee ?: 0, attrs ?: "")
+        val txn = newTransaction(this.account, pld, nextNonce, fee ?: 0.0, attrs ?: "")
         return rpcApi.sendRawTransaction(Utils.hexEncode(txn.toByteArray()))
     }
 
@@ -229,12 +229,12 @@ class Wallet(
         topic: String,
         identifier: String? = "",
         nonce: Long? = null,
-        fee: Long? = 0,
+        fee: Double? = 0.0,
         attrs: String? = ""
     ): String? {
         val nextNonce = nonce ?: this.getNonce() ?: 0
         val pld = newUnsubscribe(this.publicKeyHash, identifier ?: "", topic)
-        val txn = newTransaction(this.account, pld, nextNonce, fee ?: 0, attrs ?: "")
+        val txn = newTransaction(this.account, pld, nextNonce, fee ?: 0.0, attrs ?: "")
         return rpcApi.sendRawTransaction(Utils.hexEncode(txn.toByteArray()))
     }
 

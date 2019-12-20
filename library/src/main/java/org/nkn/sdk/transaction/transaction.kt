@@ -26,7 +26,7 @@ fun newTransaction(
     account: Account,
     pld: TransactionProto.Payload,
     nonce: Long,
-    fee: Long = 0,
+    fee: Double = 0.0,
     attrs: String = ""
 ): TransactionProto.Transaction {
 
